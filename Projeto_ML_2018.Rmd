@@ -1,0 +1,113 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Laercio"
+date: "06 de janeiro de 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+The goal of this project is to predict the manner in which they did the exercise. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and will also use your prediction model to predict 20 different test cases.
+
+## Data
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+## 1. Loading library
+```{r}
+library(caret)
+library(randomForest)
+library(gbm)
+```
+
+
+## 2. Load Data   
+```{r} 
+
+pml_training <- read.csv("data/pml-training.csv")
+dim(pml_training)   
+
+pml_testing <- read.csv("data/pml-testing.csv")
+dim(pml_testing)    
+
+```
+
+
+## 3. Cleaning Training Data
+```{r} 
+set.seed(13)
+
+# Delete columns with missing values
+pml_training2 <- pml_training[,colSums(is.na(pml_training)) == 0] 
+dim(pml_training2)
+
+## Delete columns with Nearly Zero Variance
+nearZero <- nearZeroVar(pml_training2)
+pml_training3 <- pml_training2[, -nearZero]
+dim(pml_training3)
+
+# Delete unused columns
+pml_training4 <- pml_training3[,-(1:6)]
+dim(pml_training4)
+```
+
+
+## 4. Dataset Partitioning
+
+```{r} 
+inTrain <- createDataPartition(pml_training4$classe, p=0.7, list=FALSE)
+training <- pml_training4[inTrain, ]
+testing <- pml_training4[-inTrain, ]
+dim(training)   
+dim(testing)   
+```
+
+
+## 5. Prediction in Test set
+
+Predict classe with all the other variables using a random forest ("rf"), boosted trees ("gbm") and linear discriminant analysis ("lda") model. 
+
+
+```{r} 
+## Random forest with cross validation
+rfModFit <- train(classe ~ .,data=training,method="rf", trControl = trainControl(method="cv", number = 10))
+rfPred <- predict(rfModFit,testing)
+confusionMatrix(testing$classe, rfPred)  
+
+## boosted predictor using the "gbm" method and cross validation
+modGbm <- train(classe ~ ., method="gbm",data=training, verbose=FALSE, trControl = trainControl(method="cv", number = 10))
+gbmPred <- predict(modGbm,testing)
+confusionMatrix(testing$classe, gbmPred)   
+
+## linear discriminant analysis (LDA)
+modlda = train(classe ~ .,data=training,method="lda")  
+ldaPred <- predict(modlda,testing)
+confusionMatrix(testing$classe, ldaPred)    
+
+```
+
+## 6. Choosen Model to apply in the real test set with 20 observations
+
+The accuracy of the 3 regression modeling methods above are:
+Random Forest: 0.9937
+Boosting (Gbm): 0.9667 
+Lda: 0.7091 
+
+The random forest model was chosen.
+
+```{r} 
+## Random forest with cross validation
+rfFinalPrediction <- predict(rfModFit,pml_testing)
+rfFinalPrediction
+```
